@@ -1,2 +1,2 @@
-# personal_config
-personal_config
+# personal_dotfiles
+my personal configs of linux

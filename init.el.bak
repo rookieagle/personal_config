@@ -1,0 +1,491 @@
+;;; Package --- init.el
+;;; Commentary:
+;;; Code:
+
+;;; ================ normal configuration ==============
+;; 关闭工具栏，tool-bar-mode 即为一个 Minor Mode
+(tool-bar-mode -1)
+
+;; 关闭文件滑动控件
+(scroll-bar-mode -1)
+(menu-bar-mode -1)
+(blink-cursor-mode -1)
+(tooltip-mode -1)
+(set-fringe-mode 10)
+
+(global-set-key (kbd "<escape>") 'keyboard-escape-quit)
+
+;; 显示行号
+(global-display-line-numbers-mode)
+;; 行号右对齐
+(setq global-display-line-numbers-width-start t)
+
+;; Set up the visible bell
+(setq visible-bell t)
+
+;; Font
+(set-face-attribute 'default nil :font "FiraCode Nerd Font Mono" :height 120)
+
+;; 关闭启动帮助画面
+(setq inhibit-splash-screen t)
+
+;; 关闭缩进
+;; (electric-indent-mode -1)
+
+;; 内置的智能补全括号
+(electric-pair-mode t)
+
+;; 高亮括号
+(show-paren-mode 1)
+
+;; 更改显示字体大小 xx pt
+;; (set-frame-font "FiraCode Nerd Font Mono 12")
+;; (set-frame-font "Monaco 12")
+;; (set-frame-font "YaHei Consolas Hybrid 12")
+;; (setq linum-format "%d ") ;; 注意%d后有空格，即用空格将行号和代码隔开
+
+;;; Set window size
+(setq default-frame-alist '((width . 99) (height . 36)))
+
+;; 禁用备份文件
+;; (setq make-backup-files nil)
+
+;; 关闭锁文件
+(setq create-lockfiles nil)
+
+
+;; load-theme
+;; (load-theme 'tango-dark t)
+
+
+;; utf-8
+(set-charset-priority 'unicode)
+(setq locale-coding-system 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+(set-selection-coding-system 'utf-8)
+(prefer-coding-system 'utf-8)
+(setq default-process-coding-system '(utf-8-unix . utf-8-unix))
+
+
+
+;; The default is 800 kilobytes.  Measured in bytes.
+(setq gc-cons-threshold (* 50 1000 1000))
+
+;; Profile emacs startup
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (message "*** Emacs loaded in %s with %d garbage collections."
+                     (format "%.2f seconds"
+                             (float-time
+                              (time-subtract after-init-time before-init-time)))
+                     gcs-done)))
+
+
+
+
+;; ======================= package configuration =======================
+
+;; Initialize package sources
+(require 'package)
+
+(setq package-archives '(("gnu"   . "http://elpa.emacs-china.org/gnu/")
+                         ("melpa" . "http://elpa.emacs-china.org/melpa/")))
+
+
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
+
+
+;; Initialize use-package on non-Linux platforms
+(unless (package-installed-p 'use-package)
+  (package-install 'use-package))
+
+(require 'use-package)
+(setq use-package-always-ensure t)
+
+
+
+
+
+
+;;; ======================= basic =================================
+;; Ensure environment variables inside Emacs look the same as in the user's shell.
+(use-package exec-path-from-shell
+  :config
+  (when (memq window-system '(mac ns x))
+    (exec-path-from-shell-initialize)))
+
+
+;; Expand available key options
+(use-package which-key
+  :init
+  (setq which-key-show-early-on-C-h t)
+  (setq which-key-idle-delay 1)
+  (setq which-key-idle-secondary-delay 0.05)
+  :config
+  (which-key-mode))
+
+;; Recent files
+(use-package recentf
+  :ensure nil
+  :hook (after-init . recentf-mode)
+  :init (setq recentf-max-saved-items 300
+              recentf-exclude
+              '("\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
+                "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\|bmp\\|xpm\\)$"
+                "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
+                "^/tmp/" "^/var/folders/.+$" ; "^/ssh:"
+                (lambda (file) (file-in-directory-p file package-user-dir)))
+	      ;; Don't check remote files' presences
+              recentf-keep '(file-remote-p file-readable-p))
+  :config
+  (setq recentf-save-file (recentf-expand-file-name "~/.emacs.d/recentf"))
+  (setq recentf-auto-cleanup 'never) ; Don't conflict with tramp!
+  (push (expand-file-name recentf-save-file) recentf-exclude))
+
+
+
+
+;; hungry-delete
+(use-package hungry-delete
+  :config
+  (global-hungry-delete-mode))
+
+
+;; smartparens
+(use-package smartparens
+  :hook
+  (prog-mode . smartparens-mode))
+
+
+(use-package avy
+  :bind (("C-'" . avy-goto-char-2)
+	 ("C-:" . avy-goto-char)
+	 ("M-g f" . avy-goto-line)
+	 ("M-g e" . avy-goto-word-1)
+	 ;; 复用上一次搜索
+	 ("C-c C-j" . avy-resume))
+  :config
+  (setq avy-background t ;; 打关键字时给匹配结果加一个灰背景，更醒目
+        avy-all-windows t ;; 搜索所有 window，即所有「可视范围」
+        avy-timeout-seconds 0.3)) ;; 「关键字输入完毕」信号的触发时间
+
+
+;; projectile
+(use-package projectile
+  :delight
+  :ensure t
+  :init
+  (projectile-mode +1)
+  :bind (:map projectile-mode-map
+	      ("C-c p" . projectile-command-map)))
+
+(use-package counsel-projectile
+  :after (projectile-mode)
+  :config (counsel-projectile-mode))
+
+;;; ================== ivy counsel swiper ========================
+
+(use-package ivy
+  :diminish
+  :bind (("C-s" . swiper))
+  :init
+  (ivy-mode 1)
+  :config
+  (setq ivy-use-virtual-buffers t)
+  (setq ivy-wrap t)
+  (setq ivy-count-format "(%d/%d) ")
+  (setq enable-recursive-minibuffers t))
+
+(use-package counsel
+  :demand t
+  :bind (("M-x" . counsel-M-x)
+         ("C-x b" . counsel-ibuffer)
+         ("C-x C-f" . counsel-find-file)
+         ("C-M-i" . counsel-imenu)
+         ("C-c k" . counsel-ag)
+         ("C-c l" . counsel-locate)
+         ("C-c g" . counsel-git)
+         ("C-x C-r" . counsel-recentf)
+         :map minibuffer-local-map
+         ("C-r" . 'counsel-minibuffer-history))
+  :custom
+  (counsel-linux-app-format-function #'counsel-linux-app-format-function-name-only)
+  :config
+  (setq ivy-initial-inputs-alist nil)) ;; Don't start searches with ^
+
+
+
+(use-package prescient
+  :config
+  (prescient-persist-mode 1))
+
+(use-package ivy-prescient
+  :after (prescient ivy)
+  :config
+  (ivy-prescient-mode 1))
+
+
+(use-package ivy-rich
+  :init
+  (ivy-rich-mode 1)
+  :after counsel
+  :config
+  (setq ivy-format-function #'ivy-format-function-line)
+  (setq ivy-rich-display-transformers-list
+        (plist-put ivy-rich-display-transformers-list
+                   'ivy-switch-buffer
+                   '(:columns
+                     ((ivy-rich-candidate (:width 40))
+                      (ivy-rich-switch-buffer-indicators (:width 4 :face error :align right)); return the buffer indicators
+                      (ivy-rich-switch-buffer-major-mode (:width 12 :face warning))          ; return the major mode info
+                      (ivy-rich-switch-buffer-project (:width 15 :face success))             ; return project name using `projectile'
+                      (ivy-rich-switch-buffer-path (:width (lambda (x) (ivy-rich-switch-buffer-shorten-path x (ivy-rich-minibuffer-width 0.3))))))  ; return file path relative to project root or `default-directory' if project is nil
+                     :predicate
+                     (lambda (cand)
+                       (if-let ((buffer (get-buffer cand)))))))))
+                           ;; Don't mess with EXWM buffers
+                           ;; (with-current-buffer buffer
+                            ;;  (not (derived-mode-p 'exwm-mode)))))))))
+
+
+
+;;; =================== completion ========================
+;; 著名的Emacs补全框架
+(use-package company
+  :defer 5
+  :diminish
+  :init
+  (setq company-tooltip-align-annotations t
+        company-idle-delay 0.1
+        company-echo-delay 0
+        company-minimum-prefix-length 2
+        company-require-match nil
+        company-dabbrev-ignore-case nil
+        company-dabbrev-downcase nil
+        company-show-numbers t)
+  :bind (:map company-active-map
+              ("M-n" . nil)
+              ("M-p" . nil)
+              ("C-n" . #'company-select-next)
+              ("C-p" . #'company-select-previous))
+  :config
+  (global-company-mode t))
+
+;; 人工智能补全代码
+(use-package company-tabnine
+  :diminish
+  :after company
+  :config (add-to-list 'company-backends #'company-tabnine))
+
+;; 美化company
+(use-package company-box
+  :hook (company-mode . company-box-mode))
+
+;; 代码片段
+(use-package yasnippet
+  :defer 5
+  :config
+  (setq yas-snippet-dirs '("~/.emacs.d/etc/snippets")))
+
+
+;; company-prescient
+(use-package company-prescient
+  :after (prescient company)
+  :config
+  (company-prescient-mode 1))
+
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+
+
+(use-package undo-tree
+  :init
+  (global-undo-tree-mode 1))
+
+
+;;; ==================================== window ================================
+
+(use-package ace-window
+  :bind (("M-o" . ace-window))
+  :custom
+  (aw-scope 'frame)
+  (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+  (aw-minibuffer-flag t)
+  :config
+  (ace-window-display-mode 1))
+
+
+(use-package winum
+  :init (setq winum-keymap
+              (let ((map (make-sparse-keymap)))
+            (define-key map (kbd "C-²") 'winum-select-window-by-number)
+            (define-key map (kbd "C-`") 'winum-select-window-0-or-10)
+            (define-key map (kbd "M-1") 'winum-select-window-1)
+            (define-key map (kbd "M-2") 'winum-select-window-2)
+            (define-key map (kbd "M-3") 'winum-select-window-3)
+            (define-key map (kbd "M-4") 'winum-select-window-4)
+            (define-key map (kbd "M-5") 'winum-select-window-5)
+            (define-key map (kbd "M-6") 'winum-select-window-6)
+            (define-key map (kbd "M-7") 'winum-select-window-7)
+            (define-key map (kbd "M-8") 'winum-select-window-8)
+            (define-key map (kbd "M-9") 'winum-select-window-9)
+            map))
+  :config
+  (winum-mode))
+
+
+;;; ============================= org ================================
+
+(use-package org-bullets
+  :hook (org-mode . org-bullets-mode))
+
+
+;;; ========================= git ================================
+;; Great git extensions
+
+(use-package ediff
+  :ensure nil
+  :config
+  (setq ediff-window-setup-function 'ediff-setup-windows-plain)
+  (setq-default ediff-highlight-all-diffs 'nil)
+  (setq ediff-diff-options "-w"))
+
+(use-package magit
+  :config
+  (setq magit-completing-read-function 'ivy-completing-read)
+  :bind
+  ;; Magic
+  ("C-x g s" . magit-status)
+  ("C-x g x" . magit-checkout)
+  ("C-x g c" . magit-commit)
+  ("C-x g p" . magit-push)
+  ("C-x g u" . magit-pull)
+  ("C-x g e" . magit-ediff-resolve)
+  ("C-x g r" . magit-rebase-interactive))
+
+(use-package magit-popup)
+
+(use-package git-gutter
+    :custom
+    (git-gutter:modified-sign "~")
+    (git-gutter:added-sign    "+")
+    (git-gutter:deleted-sign  "-")
+    :custom-face
+    (git-gutter:modified ((t (:foreground "#f1fa8c" :background "#f1fa8c"))))
+    (git-gutter:added    ((t (:foreground "#50fa7b" :background "#50fa7b"))))
+    (git-gutter:deleted  ((t (:foreground "#ff79c6" :background "#ff79c6"))))
+    :config
+    (global-git-gutter-mode +1))
+
+(use-package git-timemachine
+  :bind ("C-x g t" . git-timemachine-toggle))
+
+(use-package browse-at-remote
+  :bind ("C-x g b" . browse-at-remote))
+
+
+;; ======================= evil ========================================
+
+(use-package evil
+  :init
+  (setq evil-want-integration t)
+  (setq evil-want-keybinding nil)
+  (setq evil-want-C-u-scroll t)
+  (setq evil-want-C-i-jump nil)
+  (setq evil-respect-visual-line-mode t)
+  (setq evil-undo-system 'undo-tree)
+  :config
+  (evil-mode 1)
+  (define-key evil-insert-state-map (kbd "C-g") 'evil-normal-state)
+  (define-key evil-insert-state-map (kbd "C-h") 'evil-delete-backward-char-and-join)
+
+  ;; Use visual line motions even outside of visual-line-mode buffers
+  (evil-global-set-key 'motion "j" 'evil-next-visual-line)
+  (evil-global-set-key 'motion "k" 'evil-previous-visual-line))
+
+
+(use-package evil-collection
+  :after evil
+  :init
+  (setq evil-collection-company-use-tng nil)  ;; Is this a bug in evil-collection?
+  :custom
+  (evil-collection-outline-bind-tab-p nil)
+  :config
+  (setq evil-collection-mode-list
+        (remove 'lispy evil-collection-mode-list))
+  (evil-collection-init))
+
+(use-package evil-surround
+  :after evil
+  :config
+  (global-evil-surround-mode 1))
+
+
+
+;; ====================== neotree =============================
+
+(use-package neotree
+  :bind
+  (("<f8>" . neotree-toggle))
+  :config
+  (setq neo-theme (if (display-graphic-p) 'icons 'arrow)))
+
+
+
+
+;; ==================== 美化 ===============================
+
+(use-package doom-modeline
+  :ensure t
+  :hook (after-init . doom-modeline-mode))
+
+(use-package all-the-icons
+  :config
+  (setq inhibit-compacting-font-caches t)
+  (setq neo-theme 'icons)
+  (setq doom-modeline-env-version t)) ;; Whether display the environment version.
+
+
+(use-package doom-themes
+  :ensure t
+  :config
+  ;; Global settings (defaults)
+  (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+        doom-themes-enable-italic t) ; if nil, italics is universally disabled
+  (load-theme 'doom-dracula t)
+
+  ;; Enable flashing mode-line on errors
+  (doom-themes-visual-bell-config)
+  ;; Enable custom neotree theme (all-the-icons must be installed!)
+  (doom-themes-neotree-config)
+  ;; Corrects (and improves) org-mode's native fontification.
+  (doom-themes-org-config))
+
+
+
+
+
+
+
+
+
+
+(provide 'init.el)
+;;; init.el ends here
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(package-selected-packages '(use-package)))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(git-gutter:added ((t (:foreground "#50fa7b" :background "#50fa7b"))))
+ '(git-gutter:deleted ((t (:foreground "#ff79c6" :background "#ff79c6"))))
+ '(git-gutter:modified ((t (:foreground "#f1fa8c" :background "#f1fa8c")))))
