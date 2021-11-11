@@ -7,7 +7,7 @@ syntax on
 syntax enable
 set autoindent
 set ruler " 在状态栏显示光标的当前位置，位于哪一行那一列
-" set cursorline
+set cursorline
 set fileencodings=utf-8,ucs-bom,gb18030,gbk,gb2312,cp936
 set termencoding=utf-8
 set encoding=utf-8
@@ -55,11 +55,16 @@ set autowrite
 set wildmenu
 set wildmode=longest:list,full " 命令模式下，底部操作指令按下tab自动补全，第一次tab，会显示所有匹配的操作指令清单，第二次tab，依次选择各个指令
 
-"==============================================================================
+" ==============================================================================
 " 主题配色 
-"==============================================================================
+" ==============================================================================
 colorscheme gruvbox
 set background=dark
+
+" ============================ 配合nvim-treesitter ==================
+set foldmethod=expr
+set foldexpr=nvim_treesitter#foldexpr()
+
 
 
 " ========================================================================
@@ -77,11 +82,16 @@ noremap <silent><leader>/ :nohls<CR>
 
 "设置切换Buffer快捷键"
 nnoremap <C-n> :bn<CR>
-" nnoremap <C-P> :bp<CR> " 和ctrlp快捷键冲突了
+nnoremap <C-p> :bprevious<CR>
 nnoremap <C-d> :bdelete<CR>
 
-
-
+" ===================== neovim python provider ===============
+" let g:python_host_prog  = '/usr/bin/python'
+let g:python3_host_prog  = '/usr/bin/python3'
+let g:python_host_prog  = '/usr/bin/python'
+let g:loaded_ruby_provider = 0 " 禁止neovim的healthcheck检查ruby
+let g:loaded_perl_provider = 0 " 禁止neovim的healthcheck检查ruby
+let g:loaded_python_provider = 0 " 禁止neovim的healthcheck检查ruby
 
 call plug#begin('~/.config/nvim/plugged')
 " 一个强大的对齐文本的插件
@@ -115,36 +125,28 @@ Plug 'easymotion/vim-easymotion'
 " 配合Nerd Font的一些图标
 Plug 'ryanoasis/vim-devicons'
 
-" 自动注释的功能
-Plug 'preservim/nerdcommenter'
-
 " coc-nvim
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
-
-" Ctrlp Full path fuzzy file buffer mru tag ... finder for vim
-Plug 'ctrlpvim/ctrlp.vim'
 
 " nvim-colorizer.lua
 Plug 'norcalli/nvim-colorizer.lua'
 
-
 " far.vim  批量搜索替换
 Plug 'brooth/far.vim'
-
-" tagbar 依赖ctags https://ctags.io/
-" debian 可以直接通过apt下载 universal-ctags
-Plug 'preservim/tagbar'
 
 " 高亮感兴趣的单词，便于阅读代码 快捷键 <leader> k
 Plug 'lfv89/vim-interestingwords'
 
-" 代码注释 快捷键gc  gcgc
+" 代码注释 快捷键 <leader>/
 Plug 'tpope/vim-commentary'
 
 " telescope.nvim
-" Plug 'nvim-lua/popup.nvim'
-" Plug 'nvim-lua/plenary.nvim'
-" Plug 'nvim-telescope/telescope.nvim'
+Plug 'nvim-lua/popup.nvim'
+Plug 'nvim-lua/plenary.nvim'
+Plug 'nvim-telescope/telescope.nvim'
+
+" treesitter
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}  " We recommend updating the parsers on update
 
 " theme
 Plug 'morhetz/gruvbox'
@@ -214,6 +216,9 @@ nmap ghs <Plug>(GitGutterStageHunk)
 nmap ghu <Plug>(GitGutterUndoHunk)
 nmap ghp <Plug>(GitGutterPreviewHunk)
 
+" ================ vim-commentary ===================
+nnoremap <leader>/ :Commentary<CR>
+vnoremap <leader>/ :Commentary<CR>
 
 
 " ================  easy-motion  ========================
@@ -234,8 +239,9 @@ nmap <Leader>w <Plug>(easymotion-overwin-w)
 
 
 
-" ================= coc.nvim ================================
-let g:coc_global_extensions = ['coc-json', 'coc-tsserver', 'coc-pyright', 'coc-css', 'coc-html', 'coc-cssmodules', 'coc-eslint', 'coc-git', 'coc-stylelintplus', 'coc-snippets', 'coc-sql', 'coc-xml', 'coc-yaml', 'coc-vetur', 'coc-emmet', 'coc-go', 'coc-rust-analyzer', 'coc-pairs', 'coc-markdownlint', 'coc-pairs', 'coc-lists', 'coc-tabnine']
+" ============================= coc.nvim ================================
+
+let g:coc_global_extensions = ['coc-json', 'coc-tsserver', 'coc-pyright', 'coc-css', 'coc-html', 'coc-cssmodules', 'coc-eslint', 'coc-git', 'coc-stylelintplus', 'coc-snippets', 'coc-sql', 'coc-xml', 'coc-yaml', 'coc-vetur', 'coc-emmet', 'coc-go', 'coc-pairs', 'coc-pairs', 'coc-lists', 'coc-tabnine', 'coc-html-css-support', 'coc-sumneko-lua', 'coc-sh']
 
 " coc.nvim 配置golang 自动导入 missing imports and auto-format 配和coc-go使用
 autocmd BufWritePre *.go :call CocAction('runCommand', 'editor.action.organizeImport')
@@ -260,12 +266,18 @@ function! s:check_back_space() abort
 endfunction
 
 " Use <c-space> to trigger completion.
+" if has('nvim')
+"   inoremap <silent><expr> <c-space> coc#refresh()
+" else
+"   inoremap <silent><expr> <c-@> coc#refresh()
+" endif
+
+" Use <c-space> to trigger completion.
 if has('nvim')
-  inoremap <silent><expr> <c-space> coc#refresh()
+  inoremap <silent><expr> <C-Enter> coc#refresh()
 else
   inoremap <silent><expr> <c-@> coc#refresh()
 endif
-
 
 
 " Use `[g` and `]g` to navigate diagnostics
@@ -289,45 +301,41 @@ function! s:show_documentation()
   endif
 endfunction
 
-" ===================== ctrlp =========================
-let g:ctrlp_map = '<c-p>'
-let g:ctrlp_cmd = 'CtrlP'
-" When invoked without an explicit starting directory, CtrlP will set its local working directory according to this variable
-let g:ctrlp_working_path_mode = 'ra'
-" If a file is already open, open it again in a new pane instead of switching to the existing pane
-let g:ctrlp_switch_buffer = 'et'
-
-" Exclude files and directories using Vim's wildignore and CtrlP's own g:ctrlp_custom_ignore. If a custom listing command is being used, exclusions are ignored
-set wildignore+=*/tmp/*,*.so,*.swp,*.zip     " MacOSX/Linux
-set wildignore+=*\\tmp\\*,*.swp,*.zip,*.exe  " Windows
-
-let g:ctrlp_custom_ignore = {
-  \ 'dir':  '\v[\/]\.(git|hg|svn)$',
-  \ 'file': '\v\.(exe|so|dll)$',
-  \ 'link': 'some_bad_symbolic_links',
-  \ }
-
-" Use a custom file listing command
-let g:ctrlp_user_command = 'find %s -type f'        " MacOSX/Linux
-let g:ctrlp_user_command = 'dir %s /-n /b /s /a-d'  " Windows
-
-" Ignore files in .gitignore
-let g:ctrlp_user_command = ['.git', 'cd %s && git ls-files -co --exclude-standard']
 
 
-" =================== tagbar =================================
-nmap <F8> :TagbarToggle<CR>
+
+
+
+
+
 
 " ============================ telescope =====================
 " Find files using Telescope command-line sugar.
-" nnoremap <leader>ff <cmd>Telescope find_files<cr>
-" nnoremap <leader>fg <cmd>Telescope live_grep<cr>
-" nnoremap <leader>fb <cmd>Telescope buffers<cr>
-" nnoremap <leader>fh <cmd>Telescope help_tags<cr>
+nnoremap <leader>ff <cmd>Telescope find_files<cr>
+nnoremap <leader>fg <cmd>Telescope live_grep<cr>
+nnoremap <leader>fb <cmd>Telescope buffers<cr>
+nnoremap <leader>fh <cmd>Telescope help_tags<cr>
 
-" Using Lua functions
-" nnoremap <leader>ff <cmd>lua require('telescope.builtin').find_files()<cr>
-" nnoremap <leader>fg <cmd>lua require('telescope.builtin').live_grep()<cr>
-" nnoremap <leader>fb <cmd>lua require('telescope.builtin').buffers()<cr>
-" nnoremap <leader>fh <cmd>lua require('telescope.builtin').help_tags()<cr>
+
+" ============================ nvim-treesitter ====================
+lua <<EOF
+require'nvim-treesitter.configs'.setup {
+  highlight = {
+    enable = true,
+    additional_vim_regex_highlighting = false,
+  },
+  incremental_selection = {
+    enable = true,
+    keymaps = {
+      init_selection = "gnn",
+      node_incremental = "grn",
+      scope_incremental = "grc",
+      node_decremental = "grm",
+    },
+  },
+  indent = {
+    enable = true
+  }
+}
+EOF
 
